@@ -314,6 +314,15 @@ def picture_names(wav_names):
     return [prefix] if prefix else list(wav_names)
 
 
+def copy_picture(src, dst):
+    """Copy a picture, unless it is already exactly where it would be written.
+
+    A picture that sits in its own folder is borrowed by the IR folder that holds it, and
+    would otherwise be copied onto itself, so the copy is skipped when the paths match."""
+    if os.path.abspath(src) != os.path.abspath(dst):
+        shutil.copyfile(src, dst)
+
+
 def write_picture(src, out, names, png_pictures, stats, log):
     """Write one picture into the folder out, under each name in names.
 
@@ -323,7 +332,9 @@ def write_picture(src, out, names, png_pictures, stats, log):
     whose name starts an IR name and may look for either extension.
 
     A record that will not open as an image is skipped and reported rather than written out
-    under a picture name: the libraries hold a couple of placeholders and a movie named .jpg."""
+    under a picture name: the libraries hold a couple of placeholders and a movie named .jpg.
+    A picture that cannot be written is skipped the same way, so one bad file never stops a
+    conversion."""
     try:
         with Image.open(src) as im:
             fmt = im.format
@@ -331,22 +342,26 @@ def write_picture(src, out, names, png_pictures, stats, log):
         log.write("picture not readable, skipped: %s (%s)\n" % (src, e))
         print("picture not readable, skipped: %s" % src)
         return
-    if not png_pictures:
-        ext = PICTURE_EXT_FOR.get(fmt, os.path.splitext(src)[1].lower())
-        for name in names:
-            shutil.copyfile(src, os.path.join(out, name + ext))
-        stats["pictures"] += 1
+    try:
+        if not png_pictures:
+            ext = PICTURE_EXT_FOR.get(fmt, os.path.splitext(src)[1].lower())
+            for name in names:
+                copy_picture(src, os.path.join(out, name + ext))
+        else:
+            with Image.open(src) as im:
+                for name in names:
+                    if fmt == "JPEG":
+                        copy_picture(src, os.path.join(out, name + ".jpg"))
+                    else:
+                        im.convert("RGB").save(os.path.join(out, name + ".jpg"), quality=95)
+                    if fmt == "PNG":
+                        copy_picture(src, os.path.join(out, name + ".png"))
+                    else:
+                        im.save(os.path.join(out, name + ".png"))
+    except OSError as e:
+        log.write("picture not written, skipped: %s (%s)\n" % (src, e))
+        print("picture not written, skipped: %s" % src)
         return
-    with Image.open(src) as im:
-        for name in names:
-            if fmt == "JPEG":
-                shutil.copyfile(src, os.path.join(out, name + ".jpg"))
-            else:
-                im.convert("RGB").save(os.path.join(out, name + ".jpg"), quality=95)
-            if fmt == "PNG":
-                shutil.copyfile(src, os.path.join(out, name + ".png"))
-            else:
-                im.save(os.path.join(out, name + ".png"))
     stats["pictures"] += 1
 
 
