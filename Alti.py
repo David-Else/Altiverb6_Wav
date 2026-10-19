@@ -49,8 +49,8 @@ it as the 4th field of its info.iri line ("name: 3 <rate> <samples> <gain dB> ..
 applies those gains (checked on the library: it brings the late-tail levels of the channels in a
 folder together, the opposite sign drives them apart), then scales each folder as a whole so its
 loudest channel peaks at -0.1 dBFS. Balance between L/R/surround channels is kept that way.
-Sample rate (48 or 44.1 kHz) also comes from info.iri. Output is 32-bit float WAV, or 24-bit
-PCM with --pcm24; --raw writes the stored samples without the gains. --join writes one
+Sample rate (48 or 44.1 kHz) also comes from info.iri. Output is 24-bit PCM WAV; --raw writes the
+stored samples without the gains. --join writes one
 multichannel file per IR instead of one mono file per channel: a stereo pair becomes one stereo
 file, and a true stereo set becomes one four channel file in LL, LR, RL, RR order, the layout a
 convolution plug-in expects. IRs whose channel order is not known from their names (the 8 and 16
@@ -253,6 +253,18 @@ def safe_join(root, *parts):
     return path
 
 
+def write_wav(out, data, rate):
+    """Write one WAV, as 24-bit PCM.
+
+    Fixed point rather than float: it holds the same audio, the difference being one least
+    significant bit of the sample (-138.5 dBFS on these libraries, and 24 bits of range is more
+    than the decoded samples use), it is a quarter smaller, it is readable by every convolver,
+    editor and player, and it is what a FLAC encoder needs anyway. The clip is a guard, since a
+    sample cannot exceed full scale here and the shift below would otherwise wrap one."""
+    sf.write(out, np.round(np.clip(data, -1.0, 1.0) * 8388607).astype(np.int32) << 8,
+             rate, subtype="PCM_24")
+
+
 def convert_folder(root, files, dst, args, stats, log):
     info = read_info(root)
     channels = []  # (name, samples as float, rate)
@@ -297,11 +309,7 @@ def convert_folder(root, files, dst, args, stats, log):
     peak = max(float(np.abs(x).max()) for _, x, _ in channels) or 1.0
     scale = 10.0 ** (args.peak / 20.0) / peak
     for f, x, rate in channels:
-        out = os.path.join(dst, f + ".wav")
-        if args.pcm24:
-            sf.write(out, np.round(x * scale * 8388607).astype(np.int32) << 8, rate, subtype="PCM_24")
-        else:
-            sf.write(out, (x * scale).astype(np.float32), rate, subtype="FLOAT")
+        write_wav(os.path.join(dst, f + ".wav"), x * scale, rate)
     if stats["decoded"] // 250 != (stats["decoded"] - len(channels)) // 250:
         print("converted %d ..." % (stats["decoded"] + stats["wav read"]), flush=True)
 
@@ -565,10 +573,7 @@ def join_order(entries):
 
 def write_channel(dst, base, x, rate, scale, args):
     out = safe_join(dst, base if base.lower().endswith(".wav") else base + ".wav")
-    if args.pcm24:
-        sf.write(out, np.round(x * scale * 8388607).astype(np.int32) << 8, rate, subtype="PCM_24")
-    else:
-        sf.write(out, (x * scale).astype(np.float32), rate, subtype="FLOAT")
+    write_wav(out, x * scale, rate)
 
 
 def write_joined(dst, entries, scale, args, stats, log):
@@ -604,10 +609,7 @@ def write_joined(dst, entries, scale, args, stats, log):
                 data[:len(x), slot] = x
             data *= scale
             out = safe_join(dst, stem + ".wav")
-            if args.pcm24:
-                sf.write(out, np.round(data * 8388607).astype(np.int32) << 8, rate, subtype="PCM_24")
-            else:
-                sf.write(out, data.astype(np.float32), rate, subtype="FLOAT")
+            write_wav(out, data, rate)
             stats["joined"] += 1
 
 
@@ -752,7 +754,6 @@ def main():
     ap.add_argument("-o", "--output", default=os.path.join(base, "Altiverb 6 Library (decoded)"))
     ap.add_argument("--raw", action="store_true",
                     help="do not apply the per-channel gains from info.iri")
-    ap.add_argument("--pcm24", action="store_true", help="write 24-bit PCM instead of 32-bit float")
     # One multichannel file per IR: stereo for a stereo pair, four channels in LL LR RL RR
     # order for a true stereo set (what a convolution plug-in expects), instead of one mono
     # file per channel. Applies to .irbulk sources; the Altiverb 6 tree is written per channel.
@@ -775,8 +776,13 @@ def main():
                     help="write every picture as both .jpg and .png, for Convology, instead of "
                          "copying it in its own format")
     ap.add_argument("--peak", type=float, default=-0.1,
-                    help="peak level in dBFS of the loudest channel of each IR folder (default -0.1)")
+                    help="peak level in dBFS of the loudest channel of each IR folder, 0 or below "
+                         "(default -0.1)")
     args = ap.parse_args()
+    # 24-bit PCM cannot hold a sample above full scale, and the quantisation would wrap one rather
+    # than clip it, so refuse the request instead of writing a corrupt file.
+    if args.peak > 0:
+        ap.error("--peak must be 0 dBFS or lower: 24-bit PCM cannot hold a sample above full scale")
     sources = args.sources or [
         os.path.join(base, d, "data", "items")
         for d in ("IR Installer Complete", "IR Installer Omnisound", "IR Installer Zuylen2")

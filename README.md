@@ -6,7 +6,7 @@ Lossless converter for Altiverb 6 impulse-response libraries (IR Installer CDs) 
 Most Altiverb 6 channel files (`.1 .2 .3 .4 .L .R .C .Ls .Rs`) are not raw PCM but Audio Ease's own
 compressed format (`cir2` and two older variants): a fixed 3rd-order predictor with residuals packed
 in small blocks. `Alti.py` decodes them exactly (each file is checked against the encoder's rules),
-applies the per-channel gains and sample rates from `info.iri`, and writes 32-bit float WAVs in a
+applies the per-channel gains and sample rates from `info.iri`, and writes 24-bit PCM WAVs in a
 mirrored folder tree. See the docstring at the top of `Alti.py` for the format details.
 
     pip install numpy soundfile
@@ -14,11 +14,12 @@ mirrored folder tree. See the docstring at the top of `Alti.py` for the format d
     python3 Alti.py <items folder> -o "<output>"   # or any folder of Altiverb IRs
     python3 Alti.py <file.irbulk> -o "<output>"    # an Altiverb 7 IR bulk file
 
-Options: `--pcm24` (24-bit PCM output), `--raw` (no info.iri gains), `--join` (one multichannel
-file per IR instead of one mono file per channel), `--skip-surround` (drop the surround sets, more
-than four channels per IR), `--no-pictures` (write only the WAVs, not the pictures),
-`--png-pictures` (write every picture as both .jpg and .png, the layout Convology can use either
-way round), `--peak <dBFS>` (level of the loudest channel per IR folder, default -0.1).
+Options: `--raw` (no info.iri gains), `--join` (one multichannel file per IR instead of one mono
+file per channel), `--skip-surround` (drop the surround sets, more than four channels per IR),
+`--no-pictures` (write only the WAVs, not the pictures), `--png-pictures` (write every picture as
+both .jpg and .png, the layout Convology can use either way round), `--peak <dBFS>` (level of the
+loudest channel per IR folder, 0 dBFS or below, default -0.1). There is no output format option:
+the WAVs are always 24-bit PCM.
 
 By default each IR channel becomes its own mono `<name>.wav`. With `--join` each IR becomes one
 file: a stereo pair becomes a stereo file, a true stereo set becomes one four channel file in

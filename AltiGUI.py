@@ -15,7 +15,7 @@ import types
 from PyQt5.QtCore import QSettings, QThread, pyqtSignal
 from PyQt5.QtWidgets import (
     QApplication, QCheckBox, QDoubleSpinBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel,
-    QLineEdit, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QRadioButton, QVBoxLayout,
+    QLineEdit, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout,
     QWidget,
 )
 
@@ -130,9 +130,6 @@ class Window(QWidget):
         src_btn.clicked.connect(lambda: self.pick(self.src, "Pasta com IRs do Altiverb"))
         out_btn.clicked.connect(lambda: self.pick(self.out, "Pasta de saída"))
 
-        self.float_out = QRadioButton("32-bit float")
-        self.pcm24 = QRadioButton("24-bit PCM")
-        self.float_out.setChecked(True)
         self.raw = QCheckBox("Não aplicar os ganhos de canal do info.iri (Altiverb 6)")
         self.join = QCheckBox("Um ficheiro multi-canal por IR (estéreo, ou true stereo de 4 canais)")
         self.skip_surround = QCheckBox("Ignorar os conjuntos surround (mais de 4 canais por IR)")
@@ -147,7 +144,6 @@ class Window(QWidget):
         form = QFormLayout()
         form.addRow("Pasta de origem", self.row(self.src, src_btn))
         form.addRow("Pasta de saída", self.row(self.out, out_btn))
-        form.addRow("Formato", self.row(self.float_out, self.pcm24))
         form.addRow("Pico por pasta de IR", self.peak)
         form.addRow("", self.raw)
         form.addRow("", self.join)
@@ -216,7 +212,7 @@ class Window(QWidget):
         self.log.clear()
         self.status.setText("Convertendo %d canais (%d arquivos .irbulk)…" % (total, len(bulks)))
 
-        args = types.SimpleNamespace(raw=self.raw.isChecked(), pcm24=self.pcm24.isChecked(),
+        args = types.SimpleNamespace(raw=self.raw.isChecked(),
                                      peak=self.peak.value(), join=self.join.isChecked(),
                                      skip_surround=self.skip_surround.isChecked(),
                                      no_pictures=self.no_pictures.isChecked(),
