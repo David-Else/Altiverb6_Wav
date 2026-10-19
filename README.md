@@ -16,10 +16,9 @@ mirrored folder tree. See the docstring at the top of `Alti.py` for the format d
 
 Options: `--raw` (no info.iri gains), `--join` (one multichannel file per IR instead of one mono
 file per channel), `--skip-surround` (drop the surround sets, more than four channels per IR),
-`--no-pictures` (write only the WAVs, not the pictures), `--png-pictures` (write every picture as
-both .jpg and .png, the layout Convology can use either way round), `--peak <dBFS>` (level of the
-loudest channel per IR folder, 0 dBFS or below, default -0.1). There is no output format option:
-the WAVs are always 24-bit PCM.
+`--no-pictures` (write only the WAVs, not the pictures), `--peak <dBFS>` (level of the loudest
+channel per IR folder, 0 dBFS or below, default -0.1). There is no output format option: the WAVs
+are always 24-bit PCM.
 
 By default each IR channel becomes its own mono `<name>.wav`. With `--join` each IR becomes one
 file: a stereo pair becomes a stereo file, a true stereo set becomes one four channel file in
@@ -33,13 +32,11 @@ are the standard ones (1 = L, 2 = R, 3 = Ls, 4 = Rs).
 
 ## Pictures
 
-Pictures are copied into a `00 DEFAULT PICTURES` folder in the folder they belong to, kept in the
-format the library holds them in. The published libraries are JPEG except for two PNGs, so a
-picture is a byte for byte copy and nothing is re-encoded. Convology shows a picture whose name
-matches the start of the IR file name and accepts either extension, so `--png-pictures` also
-writes each picture as the other format, which is what the converter used to do for every picture.
-Records that are not pictures (the libraries hold a couple of placeholders and a movie named
-`.jpg`) are skipped and reported.
+Pictures are copied once each, into the folder the library keeps them in, and nothing is
+converted: the published libraries are JPEG apart from two PNGs, so a picture is a byte for byte
+copy. They are not duplicated into the IR folders, and there is no `00 DEFAULT PICTURES` folder.
+A record that is not a picture (the libraries hold a placeholder of zeros and a movie named
+`.jpg`) is skipped and reported. `--no-pictures` skips them entirely.
 
 ## Interface (PyQt5)
 

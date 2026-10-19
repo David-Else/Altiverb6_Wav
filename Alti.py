@@ -36,12 +36,8 @@ Usage:
 
 Without arguments it converts the three "IR Installer */data/items" folders next to this script
 into "Altiverb 6 Library (decoded)" next to them. The folder tree is mirrored (with the leading
-'%' that Altiverb uses on folder names removed) and each IR channel becomes <name>.wav. Pictures and
-movies go into a "00 DEFAULT PICTURES" folder the way Convology libraries are laid out. Convology
-shows a picture whose name matches the start of the IR file name, so inside an IR folder pictures
-are named after the common start of its IR names ("Main Hall config b.jpg" serves all the
-"Main Hall config b.*.wav"), as .jpg and .png; IR folders without a picture borrow
-the venue's, or the closest-named sibling folder's.
+'%' that Altiverb uses on folder names removed) and each IR channel becomes <name>.wav. Pictures
+and movies are copied once each, into the folder the library keeps them in.
 info.iri and .kmz files are copied along.
 
 Levels: Audio Ease normalised every channel file to full scale and stored the gain that restores
@@ -57,13 +53,11 @@ convolution plug-in expects. IRs whose channel order is not known from their nam
 channel surround sets, for instance) are left as separate mono files and reported in the log;
 --skip-surround drops those sets altogether and --no-pictures writes only the WAVs.
 
-Pictures are copied to a "00 DEFAULT PICTURES" folder in the format the library holds them in,
-which is JPEG for all but two of the 5473 in the published libraries, so nothing is re-encoded
-there. Convology looks for a picture whose name starts an IR name and can use either .jpg or
-.png, so --png-pictures also writes each one as the other format; that doubles up the pictures
-and, measured, is 86% of the work of a conversion, which is why it is not the default. Records
-that are not pictures at all (the libraries hold a couple of placeholders and a movie named
-.jpg) are skipped and reported.
+Pictures are copied once each, into the folder the library keeps them in, in the format the
+library holds them in: the published libraries are JPEG apart from two PNGs, so a picture is a
+byte for byte copy and nothing is re-encoded. They are not duplicated into the IR folders, and
+there is no "00 DEFAULT PICTURES" folder. Records that are not pictures at all (the libraries
+hold a placeholder of zeros and a movie named .jpg) are skipped and reported.
 """
 
 import argparse
@@ -100,9 +94,6 @@ JOIN_RANK = {"1": 0, "L": 0, "l": 0, "2": 1, "R": 1, "r": 1,
 JOIN_CHANNELS = 4
 COPY_EXT = {".kmz", ".iri"}
 PICTURE_EXT = {".jpg", ".jpeg", ".png", ".gif"}
-# Extension to write a picture with when it is kept in its own format.
-PICTURE_EXT_FOR = {"JPEG": ".jpg", "PNG": ".png", "GIF": ".gif"}
-PICTURES_DIR = "00 DEFAULT PICTURES"
 
 
 class FormatError(Exception):
@@ -314,142 +305,42 @@ def convert_folder(root, files, dst, args, stats, log):
         print("converted %d ..." % (stats["decoded"] + stats["wav read"]), flush=True)
 
 
-def picture_names(wav_names):
-    """Convology shows a picture whose name matches the start of the IR name ("Room.png" serves
-    "Room Front.wav" and "Room Rear.wav"), so name pictures after the common start of all the IR
-    names in the folder. If they share none, every IR gets its own copy."""
-    prefix = os.path.commonprefix(wav_names).rstrip(" ._-")
-    return [prefix] if prefix else list(wav_names)
+def write_picture(src, dst, stats, log):
+    """Copy one picture, once, into the folder the library keeps it in.
 
-
-def copy_picture(src, dst):
-    """Copy a picture, unless it is already exactly where it would be written.
-
-    A picture that sits in its own folder is borrowed by the IR folder that holds it, and
-    would otherwise be copied onto itself, so the copy is skipped when the paths match."""
-    if os.path.abspath(src) != os.path.abspath(dst):
-        shutil.copyfile(src, dst)
-
-
-def write_picture(src, out, names, png_pictures, stats, log):
-    """Write one picture into the folder out, under each name in names.
-
-    The picture is copied byte for byte in its own format, so a JPEG stays exactly the JPEG the
-    library holds and a PNG keeps its pixels as they are. With png_pictures it is written as
-    both .jpg and .png instead, which is the layout Convology wants, since it looks for a picture
-    whose name starts an IR name and may look for either extension.
-
-    A record that will not open as an image is skipped and reported rather than written out
-    under a picture name: the libraries hold a couple of placeholders and a movie named .jpg.
-    A picture that cannot be written is skipped the same way, so one bad file never stops a
-    conversion."""
+    Nothing is converted, so a JPEG stays exactly the JPEG the library holds and a PNG keeps its
+    pixels. A record that will not open as an image is skipped and reported rather than written
+    out under a picture name: the libraries hold a placeholder of zeros and a movie named .jpg."""
     try:
-        with Image.open(src) as im:
-            fmt = im.format
+        with Image.open(src):
+            pass
     except OSError as e:
         log.write("picture not readable, skipped: %s (%s)\n" % (src, e))
         print("picture not readable, skipped: %s" % src)
         return
-    try:
-        if not png_pictures:
-            ext = PICTURE_EXT_FOR.get(fmt, os.path.splitext(src)[1].lower())
-            for name in names:
-                copy_picture(src, os.path.join(out, name + ext))
-        else:
-            with Image.open(src) as im:
-                for name in names:
-                    if fmt == "JPEG":
-                        copy_picture(src, os.path.join(out, name + ".jpg"))
-                    else:
-                        im.convert("RGB").save(os.path.join(out, name + ".jpg"), quality=95)
-                    if fmt == "PNG":
-                        copy_picture(src, os.path.join(out, name + ".png"))
-                    else:
-                        im.save(os.path.join(out, name + ".png"))
-    except OSError as e:
-        log.write("picture not written, skipped: %s (%s)\n" % (src, e))
-        print("picture not written, skipped: %s" % src)
-        return
+    if os.path.abspath(src) != os.path.abspath(dst):
+        shutil.copyfile(src, dst)
     stats["pictures"] += 1
 
 
-def write_pictures(pictures, movies, dst, wav_names, args, stats, log):
-    """Pictures go in "00 DEFAULT PICTURES". In an IR folder the first one is named after its IRs
-    (see picture_names), further ones get "_2", "_3"...; elsewhere they keep their own names.
-    Movies go in the same folder."""
-    if not pictures and not movies:
-        return
-    out = os.path.join(dst, PICTURES_DIR)
-    os.makedirs(out, exist_ok=True)
-    for i, src in enumerate(pictures, 1):
-        if wav_names:
-            names = [n if i == 1 else "%s_%d" % (n, i) for n in picture_names(wav_names)]
-        else:
-            names = [os.path.splitext(os.path.basename(src))[0]]
-        write_picture(src, out, names, args.png_pictures, stats, log)
-    for src in movies:
-        shutil.copyfile(src, os.path.join(out, os.path.basename(src)))
-
-
-def readable_pictures(paths):
-    good = []
-    for p in paths:
-        try:
-            with Image.open(p):
-                good.append(p)
-        except OSError:
-            pass
-    return good
-
-
-def own_pictures(folder, files):
-    pictures = []
-    for f in sorted(files):
-        if f.startswith("."):
-            continue
-        src = os.path.join(folder, f)
-        if os.path.splitext(f)[1].lower() in PICTURE_EXT:
-            pictures.append(src)
-        elif CHANNEL_SUFFIX.search(f):
-            with open(src, "rb") as fh:
-                if fh.read(3) == b"\xff\xd8\xff":  # a few channel files are mislabelled JPEGs
-                    pictures.append(src)
-    return readable_pictures(pictures)
-
-
-def borrowed_pictures(root, src_root, all_pictures):
-    """For an IR folder without a picture: the nearest parent folder's pictures, else those of the
-    sibling folder whose name is closest (e.g. "Room m-q" borrows from "Room m-m")."""
-    up = os.path.dirname(root)
-    while len(up) >= len(src_root):
-        if all_pictures.get(up):
-            return all_pictures[up]
-        up = os.path.dirname(up)
-    parent, name = os.path.split(root)
-    siblings = [d for d in all_pictures if os.path.dirname(d) == parent and all_pictures[d]]
-    if not siblings:
-        return []
-    best = max(sorted(siblings), key=lambda d: len(os.path.commonprefix([name, os.path.basename(d)])))
-    return all_pictures[best]
-
-
 def convert_tree(src_root, out_root, args, stats, log):
-    all_pictures = {} if args.no_pictures else \
-        {root: own_pictures(root, files) for root, dirs, files in os.walk(src_root)}
     for root, dirs, files in os.walk(src_root):
         dirs.sort()
         rel = os.path.relpath(root, src_root)
         dst = out_root if rel == "." else os.path.join(out_root, *[clean(p) for p in rel.split(os.sep)])
-        ir_files, movies = [], []
-        pictures = all_pictures[root]
+        ir_files, pictures, movies = [], [], []
         for f in sorted(files):
             if f.startswith(".") or f.startswith("Icon"):
                 continue
             src = os.path.join(root, f)
             ext = os.path.splitext(f)[1].lower()
-            if src in pictures or ext in PICTURE_EXT:
-                continue
-            if CHANNEL_SUFFIX.search(f):
+            if ext in PICTURE_EXT:
+                pictures.append(src)
+            elif CHANNEL_SUFFIX.search(f):
+                with open(src, "rb") as fh:
+                    if fh.read(3) == b"\xff\xd8\xff":  # a few channel files are mislabelled JPEGs
+                        pictures.append(src)
+                        continue
                 ir_files.append(f)
             elif ext == ".mov":
                 movies.append(src)
@@ -458,11 +349,13 @@ def convert_tree(src_root, out_root, args, stats, log):
                 shutil.copyfile(src, os.path.join(dst, f))
         if ir_files:
             convert_folder(root, ir_files, dst, args, stats, log)
-            if not pictures:
-                pictures = borrowed_pictures(root, src_root, all_pictures)
-                if pictures:
-                    stats["pictures borrowed"] += 1
-        write_pictures(pictures, movies, dst, ir_files, args, stats, log)
+        if pictures and not args.no_pictures:
+            os.makedirs(dst, exist_ok=True)
+            for src in pictures:
+                write_picture(src, os.path.join(dst, os.path.basename(src)), stats, log)
+        for src in movies:
+            os.makedirs(dst, exist_ok=True)
+            shutil.copyfile(src, os.path.join(dst, os.path.basename(src)))
 
 
 def irbulk_table(data, pos):
@@ -656,30 +549,24 @@ def _convert_irbulk(data, path, out_root, args, stats, log):
         missed += 1
         return default_rate
 
-    # Pictures keep their names in their own folder's "00 DEFAULT PICTURES".
-    picture_files = {}  # folder -> extracted picture paths
+    # Pictures are written once each, in the folder the library keeps them in, in their own format.
     if not args.no_pictures:
         for name, offset, _ in pictures:
             length = struct.unpack_from("<Q", data, offset)[0]
             payload = data[offset + 8:offset + 8 + length]
             try:  # a couple of records are placeholders or movies, not pictures
-                with Image.open(io.BytesIO(payload)) as im:
+                with Image.open(io.BytesIO(payload)):
                     pass
             except OSError as e:
                 log.write("picture not readable, skipped: %s (%s)\n" % (name, e))
                 print("picture not readable, skipped: %s" % name)
                 continue
             folder, base = os.path.split(name)
-            out = safe_join(out_root, folder, PICTURES_DIR)
+            out = safe_join(out_root, folder)
             os.makedirs(out, exist_ok=True)
-            dst = safe_join(out, base)
-            with open(dst, "wb") as fh:
+            with open(safe_join(out, base), "wb") as fh:
                 fh.write(payload)
-            picture_files.setdefault(folder, []).append(dst)
             stats["pictures"] += 1
-            if args.png_pictures:
-                with Image.open(dst) as im:
-                    im.save(os.path.splitext(dst)[0] + ".png")
 
     folders = {}
     for name, offset, _ in irs:
@@ -724,13 +611,6 @@ def _convert_irbulk(data, path, out_root, args, stats, log):
         else:
             for base, x, rate in decoded:
                 write_channel(dst, base, x, rate, scale, args)
-        # Pictures from the nearest folder above that has some, named so Convology finds them.
-        up = folder
-        while up and up not in picture_files:
-            up = os.path.dirname(up)
-        if picture_files.get(up):
-            write_pictures(picture_files[up], [], dst, [os.path.splitext(b)[0] for b, _, _ in decoded], args, stats, log)
-            stats["pictures borrowed"] += 1
 
     # Say which rates were used: silently forcing one rate on a mixed library was the bug.
     if rates_used:
@@ -768,13 +648,6 @@ def main():
     # need them at all.
     ap.add_argument("--no-pictures", action="store_true",
                     help="do not write the picture files, only the WAVs")
-    # By default a picture is copied in its own format: the libraries are JPEG and a PNG made
-    # from a JPEG holds the same pixels, so it costs several times the space and most of the
-    # time of a conversion while adding nothing. Convology looks for a picture whose name
-    # starts an IR name and can take either extension, so --png-pictures writes both.
-    ap.add_argument("--png-pictures", action="store_true",
-                    help="write every picture as both .jpg and .png, for Convology, instead of "
-                         "copying it in its own format")
     ap.add_argument("--peak", type=float, default=-0.1,
                     help="peak level in dBFS of the loudest channel of each IR folder, 0 or below "
                          "(default -0.1)")
@@ -789,7 +662,7 @@ def main():
         if os.path.isdir(os.path.join(base, d, "data", "items"))
     ]
     os.makedirs(args.output, exist_ok=True)
-    stats = {k: 0 for k in ("decoded", "wav read", "failed", "rate guessed", "gain missing", "pictures", "pictures borrowed", "joined", "join skipped", "surround skipped")}
+    stats = {k: 0 for k in ("decoded", "wav read", "failed", "rate guessed", "gain missing", "pictures", "joined", "join skipped", "surround skipped")}
     with open(os.path.join(args.output, "conversion log.txt"), "w") as log:
         for s in sources:
             print("Source:", s)

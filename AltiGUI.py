@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import Alti  # noqa: E402
 
 STAT_KEYS = ("decoded", "wav read", "failed", "rate guessed", "gain missing", "pictures",
-             "pictures borrowed", "joined", "join skipped", "surround skipped")
+             "joined", "join skipped", "surround skipped")
 
 
 class Cancelled(Exception):
@@ -134,7 +134,6 @@ class Window(QWidget):
         self.join = QCheckBox("Um ficheiro multi-canal por IR (estéreo, ou true stereo de 4 canais)")
         self.skip_surround = QCheckBox("Ignorar os conjuntos surround (mais de 4 canais por IR)")
         self.no_pictures = QCheckBox("Não escrever as imagens (só os WAV)")
-        self.png_pictures = QCheckBox("Escrever cada imagem em .jpg e .png (para o Convology)")
         self.peak = QDoubleSpinBox()
         self.peak.setRange(-24.0, 0.0)
         self.peak.setSingleStep(0.1)
@@ -149,7 +148,6 @@ class Window(QWidget):
         form.addRow("", self.join)
         form.addRow("", self.skip_surround)
         form.addRow("", self.no_pictures)
-        form.addRow("", self.png_pictures)
 
         self.bar = QProgressBar()
         self.status = QLabel("Escolha a pasta de origem e a pasta de saída.")
@@ -215,8 +213,7 @@ class Window(QWidget):
         args = types.SimpleNamespace(raw=self.raw.isChecked(),
                                      peak=self.peak.value(), join=self.join.isChecked(),
                                      skip_surround=self.skip_surround.isChecked(),
-                                     no_pictures=self.no_pictures.isChecked(),
-                                     png_pictures=self.png_pictures.isChecked())
+                                     no_pictures=self.no_pictures.isChecked())
         self.worker = Worker(src, out, args)
         self.worker.progress.connect(self.bar.setValue)
         self.worker.message.connect(self.log.appendPlainText)
