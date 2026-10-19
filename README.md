@@ -14,21 +14,21 @@ mirrored folder tree. See the docstring at the top of `Alti.py` for the format d
     python3 Alti.py <items folder> -o "<output>"   # or any folder of Altiverb IRs
     python3 Alti.py <file.irbulk> -o "<output>"    # an Altiverb 7 IR bulk file
 
-Options: `--raw` (no info.iri gains), `--join` (one multichannel file per IR instead of one mono
-file per channel), `--skip-surround` (drop the surround sets, more than four channels per IR),
-`--no-pictures` (write only the WAVs, not the pictures), `--peak <dBFS>` (level of the loudest
-channel per IR folder, 0 dBFS or below, default -0.1). There is no output format option: the WAVs
-are always 24-bit PCM.
+Options: `--raw` (no info.iri gains), `--no-join` (one file per channel instead of one
+multichannel file per IR), `--skip-surround` (drop the surround sets, more than four channels per
+IR), `--no-pictures` (write only the WAVs, not the pictures), `--peak <dBFS>` (level of the
+loudest channel per IR folder, 0 dBFS or below, default -0.1). There is no output format option:
+the WAVs are always 24-bit PCM.
 
-By default each IR channel becomes its own mono `<name>.wav`. With `--join` each IR becomes one
-file: a stereo pair becomes a stereo file, a true stereo set becomes one four channel file in
-LL, LR, RL, RR order (the layout a convolution plug-in expects for quad true stereo), and a
-surround set becomes one four channel file in the standard L, R, Ls, Rs order. Channels shorter
-than the longest are padded with silence. IRs whose channel order cannot be derived from their
-names, the eight and sixteen channel surround sets in particular, are left as separate mono files
-and listed in the log. The order comes from the channel names, which were checked against the
-libraries: the same audio is stored as `...1` in one folder and `...L` in another, so the numbers
-are the standard ones (1 = L, 2 = R, 3 = Ls, 4 = Rs).
+By default each IR becomes one multichannel file: a stereo pair becomes a stereo file, a true
+stereo set becomes one four channel file in LL, LR, RL, RR order (the layout a convolution plug-in
+expects for quad true stereo), and a surround set becomes one four channel file in the standard
+L, R, Ls, Rs order. Channels shorter than the longest are padded with silence. IRs whose channel
+order cannot be derived from their names, the eight and sixteen channel surround sets in
+particular, are left as separate mono files and listed in the log. With `--no-join` every channel
+becomes its own mono `<name>.wav` instead. The order comes from the channel names, which were
+checked against the libraries: the same audio is stored as `...1` in one folder and `...L` in
+another, so the numbers are the standard ones (1 = L, 2 = R, 3 = Ls, 4 = Rs).
 
 ## Pictures
 

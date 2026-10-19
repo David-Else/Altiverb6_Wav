@@ -132,6 +132,7 @@ class Window(QWidget):
 
         self.raw = QCheckBox("Não aplicar os ganhos de canal do info.iri (Altiverb 6)")
         self.join = QCheckBox("Um ficheiro multi-canal por IR (estéreo, ou true stereo de 4 canais)")
+        self.join.setChecked(True)
         self.skip_surround = QCheckBox("Ignorar os conjuntos surround (mais de 4 canais por IR)")
         self.no_pictures = QCheckBox("Não escrever as imagens (só os WAV)")
         self.peak = QDoubleSpinBox()

@@ -46,11 +46,11 @@ applies those gains (checked on the library: it brings the late-tail levels of t
 folder together, the opposite sign drives them apart), then scales each folder as a whole so its
 loudest channel peaks at -0.1 dBFS. Balance between L/R/surround channels is kept that way.
 Sample rate (48 or 44.1 kHz) also comes from info.iri. Output is 24-bit PCM WAV; --raw writes the
-stored samples without the gains. --join writes one
-multichannel file per IR instead of one mono file per channel: a stereo pair becomes one stereo
-file, and a true stereo set becomes one four channel file in LL, LR, RL, RR order, the layout a
-convolution plug-in expects. IRs whose channel order is not known from their names (the 8 and 16
-channel surround sets, for instance) are left as separate mono files and reported in the log;
+stored samples without the gains. Each IR becomes one multichannel file: a stereo pair becomes one
+stereo file, and a true stereo set becomes one four channel file in LL, LR, RL, RR order, the
+layout a convolution plug-in expects, while --no-join writes one file per channel instead. IRs
+whose channel order is not known from their names (the 8 and 16 channel surround sets, for
+instance) are left as separate mono files and reported in the log;
 --skip-surround drops those sets altogether and --no-pictures writes only the WAVs.
 
 Pictures are copied once each, into the folder the library keeps them in, in the format the
@@ -634,12 +634,11 @@ def main():
     ap.add_argument("-o", "--output", default=os.path.join(base, "Altiverb 6 Library (decoded)"))
     ap.add_argument("--raw", action="store_true",
                     help="do not apply the per-channel gains from info.iri")
-    # One multichannel file per IR: stereo for a stereo pair, four channels in LL LR RL RR
-    # order for a true stereo set (what a convolution plug-in expects), instead of one mono
-    # file per channel. Applies to .irbulk sources; the Altiverb 6 tree is written per channel.
-    ap.add_argument("--join", action="store_true",
-                    help="write one multichannel file per IR (stereo, or four channel true "
-                         "stereo) instead of one mono file per channel")
+    # One multichannel file per IR is the default: stereo for a stereo pair, four channels in
+    # LL LR RL RR order for a true stereo set, which is what a convolution plug-in expects.
+    # Applies to .irbulk sources; the Altiverb 6 tree is written per channel either way.
+    ap.add_argument("--no-join", action="store_true",
+                    help="write one file per channel instead of one multichannel file per IR")
     ap.add_argument("--skip-surround", action="store_true",
                     help="skip surround sets (more than %d channels per IR), which have no "
                          "stereo or true stereo use" % JOIN_CHANNELS)
@@ -652,6 +651,7 @@ def main():
                     help="peak level in dBFS of the loudest channel of each IR folder, 0 or below "
                          "(default -0.1)")
     args = ap.parse_args()
+    args.join = not args.no_join
     # 24-bit PCM cannot hold a sample above full scale, and the quantisation would wrap one rather
     # than clip it, so refuse the request instead of writing a corrupt file.
     if args.peak > 0:
